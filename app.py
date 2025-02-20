@@ -39,7 +39,7 @@ def convert_xml():
                 detalhes = listing.get("Details", {})
                 localizacao = listing.get("Location", {})
                 preco_info = detalhes.get("ListPrice", {}).get("#text", "0")
-                nome = detalhes.get("Tipologia", "").lower()  # Pegando o nome do imóvel
+                nome = detalhes.get("Title", "").lower()  # Pegando o nome do imóvel
 
                 # Converter preço para número
                 try:
