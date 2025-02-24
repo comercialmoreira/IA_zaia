@@ -1,4 +1,6 @@
 Flask
 requests
 xmltodict
+python-dateutil
+unidecode
 gunicorn
