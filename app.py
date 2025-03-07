@@ -5,6 +5,7 @@ import dateutil.parser
 from datetime import datetime, timedelta
 import math
 from unidecode import unidecode
+import urllib.parse
 
 app = Flask(__name__)
 
@@ -14,12 +15,17 @@ XML_URL = "https://restrito.casteldigital.com.br/vivareal_open/guilhermepilger-v
 def normalize_text(text):
     """
     Remove acentos, converte para minúsculas e remove espaços em branco extras.
-    Retorna string vazia se o valor não for uma string.
+    Também lida com dupla codificação de URL.
     """
     if text is None:
         return ""
     try:
         if isinstance(text, str):
+            # Tenta decodificar a URL, caso esteja codificada
+            text = urllib.parse.unquote(text)
+            # Tenta decodificar mais uma vez, caso tenha havido dupla codificação
+            if '%' in text:
+                text = urllib.parse.unquote(text)
             return unidecode(text).lower().strip()
         return ""
     except:
@@ -182,10 +188,16 @@ def convert_xml():
             
             # 6. Filtrar por finalidade (venda/aluguel)
             if finalidade:
-                if finalidade == "venda" and "sale" not in transaction_type:
-                    continue
-                if finalidade == "aluguel" and "rent" not in transaction_type:
-                    continue
+                # Melhorar a detecção de finalidade
+                if "venda" in finalidade or "compra" in finalidade:
+                    if "sale" not in transaction_type and "purchase" not in transaction_type:
+                        continue
+                elif "aluguel" in finalidade or "locacao" in finalidade or "locação" in finalidade:
+                    if "rent" not in transaction_type and "rental" not in transaction_type:
+                        continue
+                elif "moradia" in finalidade:
+                    # Assumir que "moradia" se refere a qualquer tipo de imóvel residencial
+                    pass  # Não filtra por finalidade neste caso
             
             # 7. Filtrar por número de quartos
             if num_quartos < quartos_min:
@@ -210,8 +222,18 @@ def convert_xml():
             # 12. Filtrar por características/desejos
             if caracteristicas:
                 lista_caract = [c.strip() for c in caracteristicas.split(",") if c.strip()]
-                if lista_caract and not any(c in ' '.join(features_lower) for c in lista_caract):
-                    continue
+                # Se não houver vírgulas, tenta dividir por espaços
+                if len(lista_caract) <= 1 and " " in caracteristicas:
+                    lista_caract = [c.strip() for c in caracteristicas.split() if c.strip()]
+                
+                # Primeiro verificamos as características exatas
+                features_text = " ".join(features_lower)
+                
+                # Verifica se alguma das características está presente nas features
+                if lista_caract and not any(c in features_text for c in lista_caract):
+                    # Se não encontrar nas features, verifica na descrição
+                    if not any(c in descricao for c in lista_caract):
+                        continue
             
             # 13. Filtrar por palavras-chave na descrição ou título
             if palavras_chave:
