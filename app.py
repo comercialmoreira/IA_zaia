@@ -31,25 +31,33 @@ def normalize_text(text):
     except:
         return ""
 
-def safe_float(value, default=0.0):
+def safe_float(value, default=0.0, min_value=None):
     """
     Converte valor para float com tratamento de erros.
+    Garante que o valor não seja menor que min_value (se especificado).
     """
     if value is None:
         return default
     try:
-        return float(value)
+        float_value = float(value)
+        if min_value is not None and float_value < min_value:
+            return min_value
+        return float_value
     except (ValueError, TypeError):
         return default
 
-def safe_int(value, default=0):
+def safe_int(value, default=0, min_value=None):
     """
     Converte valor para int com tratamento de erros.
+    Garante que o valor não seja menor que min_value (se especificado).
     """
     if value is None:
         return default
     try:
-        return int(value)
+        int_value = int(value)
+        if min_value is not None and int_value < min_value:
+            return min_value
+        return int_value
     except (ValueError, TypeError):
         return default
 
@@ -93,44 +101,40 @@ def convert_xml():
         nome_imovel = normalize_text(request.args.get("nome_imovel", ""))
         cidade = normalize_text(request.args.get("cidade", ""))
         bairro = normalize_text(request.args.get("bairro", ""))
-        preco_min = safe_float(request.args.get("preco_min"), 0)
-        preco_max = safe_float(request.args.get("preco_max"), float('inf'))
+        preco_min = safe_float(request.args.get("preco_min"), 1000, min_value=1000)
+        preco_max = safe_float(request.args.get("preco_max"), float('inf'), min_value=1000)
         tipo_imovel = normalize_text(request.args.get("tipo_imovel", ""))
         finalidade = normalize_text(request.args.get("finalidade", ""))
         
         # Filtros de características
-        quartos_min = safe_int(request.args.get("quartos_min"), 0)
-        suites_min = safe_int(request.args.get("suites_min"), 0)
-        banheiros_min = safe_int(request.args.get("banheiros_min"), 0)
-        vagas_min = safe_int(request.args.get("vagas_min"), 0)
+        quartos_min = safe_int(request.args.get("quartos_min"), 0, min_value=0)
+        suites_min = safe_int(request.args.get("suites_min"), 0, min_value=0)
+        banheiros_min = safe_int(request.args.get("banheiros_min"), 0, min_value=0)
+        vagas_min = safe_int(request.args.get("vagas_min"), 0, min_value=0)
         
         # Filtros de área
-        area_min = safe_float(request.args.get("area_min"), 0)
-        area_max = safe_float(request.args.get("area_max"), float('inf'))
+        area_min = safe_float(request.args.get("area_min"), 0, min_value=0)
+        area_max = safe_float(request.args.get("area_max"), float('inf'), min_value=0)
         
         # Filtros de características/desejos
         caracteristicas = normalize_text(request.args.get("caracteristicas", ""))
         
         # Filtros avançados
         palavras_chave = normalize_text(request.args.get("palavras_chave", ""))
-        dias_atras = safe_int(request.args.get("dias_atras"), 0)
+        dias_atras = safe_int(request.args.get("dias_atras"), 0, min_value=0)
         
         # Filtros de localização por distância
         lat = request.args.get("lat")
         lng = request.args.get("lng")
-        raio = safe_float(request.args.get("raio"), 5)  # em km
+        raio = safe_float(request.args.get("raio"), 5, min_value=0)  # em km
         
         # Opções de ordenação
         ordenar_por = request.args.get("ordenar_por", "")
         ordem = request.args.get("ordem", "asc").lower()
         
         # Opções de paginação
-        pagina = safe_int(request.args.get("pagina"), 1)
-        if pagina < 1:
-            pagina = 1
-        itens_por_pagina = safe_int(request.args.get("itens_por_pagina"), 10)
-        if itens_por_pagina < 1:
-            itens_por_pagina = 10
+        pagina = safe_int(request.args.get("pagina"), 1, min_value=1)
+        itens_por_pagina = safe_int(request.args.get("itens_por_pagina"), 10, min_value=1)
         
         listings_filtrados = []
         for listing in listings:
@@ -140,12 +144,13 @@ def convert_xml():
             location = listing.get("Location", {}) or {}
             
             # Extração e conversão dos valores numéricos de forma segura
-            preco = safe_float(details.get("ListPrice", {}).get("#text") if isinstance(details.get("ListPrice"), dict) else details.get("ListPrice"))
-            num_quartos = safe_int(details.get("Bedrooms"))
-            num_suites = safe_int(details.get("Suites"))
-            num_banheiros = safe_int(details.get("Bathrooms"))
-            area = safe_float(details.get("LivingArea", {}).get("#text") if isinstance(details.get("LivingArea"), dict) else details.get("LivingArea"))
-            vagas = safe_int(details.get("Garage", {}).get("#text") if isinstance(details.get("Garage"), dict) else details.get("Garage"))
+            # Garante que o preço seja no mínimo 1000
+            preco = safe_float(details.get("ListPrice", {}).get("#text") if isinstance(details.get("ListPrice"), dict) else details.get("ListPrice"), min_value=1000)
+            num_quartos = safe_int(details.get("Bedrooms"), min_value=0)
+            num_suites = safe_int(details.get("Suites"), min_value=0)
+            num_banheiros = safe_int(details.get("Bathrooms"), min_value=0)
+            area = safe_float(details.get("LivingArea", {}).get("#text") if isinstance(details.get("LivingArea"), dict) else details.get("LivingArea"), min_value=0)
+            vagas = safe_int(details.get("Garage", {}).get("#text") if isinstance(details.get("Garage"), dict) else details.get("Garage"), min_value=0)
             
             # Dados para filtros avançados
             property_type = normalize_text(details.get("PropertyType", ""))
@@ -281,7 +286,8 @@ def convert_xml():
                         key=lambda x: safe_float(
                             x.get("Details", {}).get("ListPrice", {}).get("#text") 
                             if isinstance(x.get("Details", {}).get("ListPrice"), dict) 
-                            else x.get("Details", {}).get("ListPrice")
+                            else x.get("Details", {}).get("ListPrice"),
+                            min_value=1000
                         ),
                         reverse=reverse_order
                     )
@@ -290,13 +296,14 @@ def convert_xml():
                         key=lambda x: safe_float(
                             x.get("Details", {}).get("LivingArea", {}).get("#text")
                             if isinstance(x.get("Details", {}).get("LivingArea"), dict)
-                            else x.get("Details", {}).get("LivingArea")
+                            else x.get("Details", {}).get("LivingArea"),
+                            min_value=0
                         ),
                         reverse=reverse_order
                     )
                 elif ordenar_por == "quartos":
                     listings_filtrados.sort(
-                        key=lambda x: safe_int(x.get("Details", {}).get("Bedrooms")),
+                        key=lambda x: safe_int(x.get("Details", {}).get("Bedrooms"), min_value=0),
                         reverse=reverse_order
                     )
                 elif ordenar_por == "data":
