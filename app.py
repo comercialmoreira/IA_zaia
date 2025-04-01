@@ -101,8 +101,7 @@ def convert_xml():
         nome_imovel = normalize_text(request.args.get("nome_imovel", ""))
         cidade = normalize_text(request.args.get("cidade", ""))
         bairro = normalize_text(request.args.get("bairro", ""))
-        preco_min = safe_float(request.args.get("preco_min"), 1000, min_value=1000)
-        preco_max = safe_float(request.args.get("preco_max"), float('inf'), min_value=1000)
+        preco_filtro = safe_float(request.args.get("preco"), 0, min_value=0)
         tipo_imovel = normalize_text(request.args.get("tipo_imovel", ""))
         finalidade = normalize_text(request.args.get("finalidade", ""))
         
@@ -184,7 +183,7 @@ def convert_xml():
                 continue
             
             # 4. Filtrar por preço
-            if not (preco_min <= preco <= preco_max):
+            if preco_filtro > 0 and abs(preco - preco_filtro) > 100:  # Tolerância de 100 unidades
                 continue
             
             # 5. Filtrar por tipo de imóvel
